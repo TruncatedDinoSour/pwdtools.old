@@ -30,3 +30,10 @@ sudo ./setup.sh
 
 - `pwdgen` -- Generate strong passwords
 - `pwdinfo` -- Check password information
+
+# Flags
+
+- `pwdgen`
+  Pass in the `-h` or `--help` flag(s) to the utility
+- `pwdinfo`
+  None
