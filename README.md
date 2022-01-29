@@ -9,6 +9,7 @@
 - Python pyfzf -- https://pypi.org/project/pyfzf/
 - Python pyperclip -- https://pypi.org/project/pyperclip/
 - Python pandas -- https://pypi.org/project/pandas/
+- GNU coreutils (or an `install` utility) -- https://www.gnu.org/software/coreutils/
 
 # Installation
 
@@ -16,7 +17,8 @@
 
 ```bash
 python3 -m pip install --user -r requirements.txt
-sudo make install
+chmod a+rx ./setup.sh
+sudo ./setup.sh
 ```
 
 ## Packages
