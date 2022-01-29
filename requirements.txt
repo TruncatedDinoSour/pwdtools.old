@@ -1,0 +1,5 @@
+password-strength
+pyfzf
+pyperclip
+pandas
+
