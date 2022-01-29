@@ -34,6 +34,13 @@ sudo ./setup.sh
 # Flags
 
 - `pwdgen`
-  Pass in the `-h` or `--help` flag(s) to the utility
+
+```
+Pass in the `-h` or `--help` flag(s) to the utility
+```
+
 - `pwdinfo`
-  None
+
+```
+None
+```
