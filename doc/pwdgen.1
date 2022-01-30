@@ -1,0 +1,94 @@
+.TH PWDGEN "1" "January 30" "Pwdgen" "General Commands Manual"
+
+
+.SH NAME
+
+pwdgen \- generate strong passwords
+
+
+.SH SYNOPSIS
+
+.B pwdgen
+[\fI\,OPTIONS...\/\fR]
+
+
+.SH DESCRIPTION
+
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Show help message and exit
+
+.TP
+\fB\-c \fI\,CHARSET\fR, \fB\-\-charset=\fI\,CHARSET\fR
+Specify a list of allowed characters
+
+.TP
+\fB\-u\fR, \fB\-\-unicode\fR
+Allow for unicode to appear in passwords
+
+.TP
+\fB\-U \fI\,UNICODE_RANGE\fR, \fB\-\-unicode\-range=\fI\,UNICODE_RANGE\fR
+Specify the unicode range, format: \fI\,min\fR,\fI\,max\fR
+
+.TP
+\fB\-C\fR, \fB\-\-copy\fR
+Copy the generated password to clipboard
+
+.TP
+\fB\-i\fR, \fB\-\-interactive\fR
+Let user pick passwords from a menu
+
+.TP
+\fB\-t \fI\,INTERACTIVE_COUNT\fR, \fB\-\-interactive-count=\fI\,INTERACTIVE_COUNT\fR
+How many passwords to generate in interactive mode
+
+.TP
+\fB\-l \fI\,LENGTH\fR, \fB\-\-length=\fI\,LENGTH\fR
+Max password length
+
+.TP
+\fB\-L \fI\,RECURSION_LIMIT\fR, \fB\-\-limit=\fI\,RECURSION_LIMIT\fR
+Set max recursion limit
+
+.TP
+\fB\-s \fI\,MIN_STRENGTH\fR, \fB\-\-min\-strength=\fI\,MIN_STRENGTH\fR
+Minimum password strength in float, 0.01 = 1%
+
+.TP
+\fB\-E \fI\,MIN_ENTROPY\fR, \fB\-\-min\-entropy=\fI\,MIN_ENTROPY\fR
+Minimum password entropy in float
+
+.TP
+\fB\-M\fR, \fB\-\-no\-modify\fR
+If password is too weak, don't modify the configuration to make it stronger
+
+.TP
+\fB\-D\fR, \fB\-\-debug\fR
+Enable debug mode
+
+.TP
+\fB\-e \fI\,END\fR, \fB\-\-end=\fI\,END\fR
+Delimeter to end output with
+
+.TP
+\fB\-\-version\fR
+Show program's version number and exit
+
+
+.SH EXAMPLES
+
+.TP
+pwdgen \-MDC
+Generate a password and copy it to clipboard (\-C), if it's not strong enough
+don't modify the config (\-M) and enable debug mode (\-D)
+
+
+.SH AUTHOR
+
+Written by Ari Archer <ari@mail.ari-web.xyz>
+
+
+.SH "REPORTING BUGS"
+
+Report any bugs or feature requests to https://ari-web.xyz/gh/pwdtools issues
+

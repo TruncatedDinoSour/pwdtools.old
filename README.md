@@ -37,6 +37,7 @@ sudo ./setup.sh
 
 ```
 Pass in the `-h` or `--help` flag(s) to the utility
+or see the man page
 ```
 
 - `pwdinfo`
