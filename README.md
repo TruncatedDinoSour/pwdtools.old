@@ -10,6 +10,7 @@
 - Python pyperclip -- https://pypi.org/project/pyperclip/
 - Python pandas -- https://pypi.org/project/pandas/
 - GNU coreutils (or an `install` utility) -- https://www.gnu.org/software/coreutils/
+- Optionally `man` utility for `man` pages -- https://www.nongnu.org/man-db/
 
 # Installation
 
@@ -43,5 +44,5 @@ or see the man page
 - `pwdinfo`
 
 ```
-None
+None or see the man page
 ```
