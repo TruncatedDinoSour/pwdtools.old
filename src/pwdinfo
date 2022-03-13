@@ -3,14 +3,18 @@
 
 import sys
 from getpass import getpass
-from password_strength import PasswordStats
-import pandas as pd
+
+from password_strength import PasswordStats  # type: ignore
 
 
 def main() -> int:
     """Entry/main function"""
 
     password = getpass("(password (hidden)) ")
+
+    if not password.strip():
+        sys.stderr.write("Password cannot be empty\n")
+        return 1
 
     stats = PasswordStats(password)
 
@@ -31,7 +35,8 @@ def main() -> int:
         "total strength": (1 - stats.weakness_factor) * stats.strength(),
     }
 
-    print(pd.DataFrame(INFO.items(), columns=["NAME", "VALUE"]))
+    for item, value in INFO.items():
+        print(f"{item:40s}{value}")
 
     return 0
 

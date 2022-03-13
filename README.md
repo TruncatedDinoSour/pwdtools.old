@@ -5,10 +5,11 @@
 # Requirements
 
 - Python 3.8 or higher
+- Linux or any other UNIX operating system
 - Python password-strength -- https://pypi.org/project/password-strength/
 - Python pyfzf -- https://pypi.org/project/pyfzf/
 - Python pyperclip -- https://pypi.org/project/pyperclip/
-- Python pandas -- https://pypi.org/project/pandas/
+- Python support for the `secrets` lib
 - GNU coreutils (or an `install` utility) -- https://www.gnu.org/software/coreutils/
 - Optionally `man` utility for `man` pages -- https://www.nongnu.org/man-db/
 

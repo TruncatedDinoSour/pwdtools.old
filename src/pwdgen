@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """Password generator script"""
 
-import random
+import secrets
 import string
 import sys
 from optparse import OptionParser, make_option
 
-from password_strength import PasswordStats
-from pyfzf import FzfPrompt
-from pyperclip import copy as copy_clipboard
+from password_strength import PasswordStats  # type: ignore
+from pyfzf import FzfPrompt  # type: ignore
+from pyperclip import copy as copy_clipboard  # type: ignore
 
-__VERSION__ = "0.0.1"
+__VERSION__ = "0.0.2"
+SYS_RANDOM: secrets.SystemRandom = secrets.SystemRandom()
 
 
 PWD_OPTIONS = OptionParser(
@@ -73,7 +74,7 @@ PWD_OPTIONS = OptionParser(
             dest="length",
             type="int",
             help="max password length",
-            default=random.randint(50, 5000),
+            default=SYS_RANDOM.randint(50, 5000),
         ),
         make_option(
             "-L",
@@ -151,14 +152,14 @@ def generate_password() -> str:
             [
                 chr(code)
                 for code in (
-                    random.randint(unicode_min, unicode_max)
+                    SYS_RANDOM.randint(unicode_min, unicode_max)
                     for _ in range(PWD_OPTIONS.length)
                 )
             ]
         )
     else:
         generated_password = "".join(
-            [random.choice(PWD_OPTIONS.charset) for _ in range(PWD_OPTIONS.length)]
+            [secrets.choice(PWD_OPTIONS.charset) for _ in range(PWD_OPTIONS.length)]
         )
 
     dprint("password generated. calculating statistics...")
@@ -174,9 +175,9 @@ def generate_password() -> str:
         dprint("modifying config...")
         PWD_OPTIONS.length += int(
             (p_stats.entropy_bits * p_strength) // p_stats.length
-            + random.randint(2, 30)
+            + SYS_RANDOM.randint(2, 30)
         )
-        PWD_OPTIONS.charset += random.choice(PWD_OPTIONS.charset)
+        PWD_OPTIONS.charset += secrets.choice(PWD_OPTIONS.charset)
 
     return (
         generated_password
