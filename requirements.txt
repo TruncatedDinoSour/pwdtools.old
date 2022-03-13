@@ -1,4 +1,5 @@
 password-strength
 pyfzf
 pyperclip
+plumbum
 

@@ -7,10 +7,12 @@ import sys
 from optparse import OptionParser, make_option
 
 from password_strength import PasswordStats  # type: ignore
+from plumbum.commands.processes import ProcessExecutionError  # type: ignore
 from pyfzf import FzfPrompt  # type: ignore
+from pyperclip import PyperclipException  # type: ignore
 from pyperclip import copy as copy_clipboard  # type: ignore
 
-__VERSION__ = "0.0.2"
+__version__ = "0.0.3"
 SYS_RANDOM: secrets.SystemRandom = secrets.SystemRandom()
 
 
@@ -74,7 +76,7 @@ PWD_OPTIONS = OptionParser(
             dest="length",
             type="int",
             help="max password length",
-            default=SYS_RANDOM.randint(50, 5000),
+            default=SYS_RANDOM.randint(250, 5000),
         ),
         make_option(
             "-L",
@@ -127,16 +129,24 @@ PWD_OPTIONS = OptionParser(
             default="\n",
         ),
     ],
-    version=__VERSION__,
+    version=__version__,
     description="Generate strong and secure passwords",
 ).parse_args()[0]
+
+
+def eprint(msg: str) -> None:
+    """print to stderr"""
+
+    sys.stderr.write(f"{msg}\n")
 
 
 def dprint(msg: str) -> None:
     """print a debug message"""
 
-    if PWD_OPTIONS.debug:
-        sys.stderr.write(f"[DEBUG] {msg}\n")
+    if not PWD_OPTIONS.debug:
+        return
+
+    eprint(f"[DEBUG] {msg}")
 
 
 def generate_password() -> str:
@@ -196,16 +206,26 @@ def main() -> int:
         dprint("interactive mode = on")
         dprint(f"generating {PWD_OPTIONS.interactive_count} passwords")
 
-        password = FzfPrompt().prompt(
-            [generate_password() for _ in range(PWD_OPTIONS.interactive_count)]
-        )[0]
+        try:
+            password = FzfPrompt().prompt(
+                (generate_password() for _ in range(PWD_OPTIONS.interactive_count))
+            )[0]
+        except ProcessExecutionError:
+            eprint("Fzf exited unexpectedly")
+            return 1
     else:
         dprint("generating password")
         password = generate_password()
 
     if PWD_OPTIONS.clipboard:
         dprint("copying password to clipboard")
-        copy_clipboard(password)
+
+        try:
+            copy_clipboard(password)
+        except PyperclipException as err:
+            eprint(f"Failed to copy to clipboard: {err}")
+            return 1
+
         dprint("copied password to clipboard")
     else:
         dprint("outputing password")
@@ -220,16 +240,30 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    dprint(f"version {__VERSION__}")
+    dprint(f"version {__version__}")
 
     if PWD_OPTIONS.recursion_limit is not None:
         dprint(
             f"setting recursion limit {sys.getrecursionlimit()} -> {PWD_OPTIONS.recursion_limit}"
         )
-        sys.setrecursionlimit(PWD_OPTIONS.recursion_limit)
+
+        try:
+            sys.setrecursionlimit(PWD_OPTIONS.recursion_limit)
+        except OverflowError:
+            eprint("The set limit via -L is too large")
+            sys.exit(1)
 
     dprint("asserting main()")
     assert main.__annotations__.get("return") is int, "main() should return an integer"
 
     dprint("running main()")
-    sys.exit(main())
+
+    ret: int = 0
+
+    try:
+        ret = main()
+    except (RecursionError, MemoryError):
+        eprint("Too much recursion, try passing the -L flag with a higher/lower number")
+        ret = 1
+
+    sys.exit(ret)
