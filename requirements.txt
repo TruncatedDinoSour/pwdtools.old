@@ -2,4 +2,5 @@ password-strength
 pyfzf
 pyperclip
 plumbum
+zxcvbn
 

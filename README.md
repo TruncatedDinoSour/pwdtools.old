@@ -13,6 +13,7 @@
 - Python support for the `secrets` lib
 - GNU coreutils (or an `install` utility) -- https://www.gnu.org/software/coreutils/
 - Optionally `man` utility for `man` pages -- https://www.nongnu.org/man-db/
+- Python zxcvbn -- https://pypi.org/project/zxcvbn/
 
 # Installation
 
@@ -33,6 +34,7 @@ sudo ./setup.sh
 
 - `pwdgen` -- Generate strong passwords
 - `pwdinfo` -- Check password information
+- `pwdzxc` -- Get realistic password information using zxcvbn
 
 # Flags
 
@@ -44,6 +46,12 @@ or see the man page
 ```
 
 - `pwdinfo`
+
+```
+None or see the man page
+```
+
+- `pwdzxc`
 
 ```
 None or see the man page
