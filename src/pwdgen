@@ -12,7 +12,7 @@ from pyfzf import FzfPrompt  # type: ignore
 from pyperclip import PyperclipException  # type: ignore
 from pyperclip import copy as copy_clipboard  # type: ignore
 
-__version__ = "0.0.3"
+__version__: str = "0.0.4"
 SYS_RANDOM: secrets.SystemRandom = secrets.SystemRandom()
 
 
@@ -126,7 +126,17 @@ PWD_OPTIONS = OptionParser(
             action="store",
             dest="end",
             help="delimeter to end output with",
+            type="str",
             default="\n",
+        ),
+        make_option(
+            "-S",
+            "--shuffle",
+            action="store",
+            dest="shuffle",
+            help="how many times to shuffle the password",
+            type="int",
+            default=10,
         ),
     ],
     version=__version__,
@@ -159,18 +169,23 @@ def generate_password() -> str:
 
         unicode_min, unicode_max = map(int, PWD_OPTIONS.unicode_range.split(",", 1))
         generated_password = "".join(
-            [
-                chr(code)
-                for code in (
-                    SYS_RANDOM.randint(unicode_min, unicode_max)
-                    for _ in range(PWD_OPTIONS.length)
-                )
-            ]
+            chr(code)
+            for code in (
+                SYS_RANDOM.randint(unicode_min, unicode_max)
+                for _ in range(PWD_OPTIONS.length)
+            )
         )
     else:
         generated_password = "".join(
-            [secrets.choice(PWD_OPTIONS.charset) for _ in range(PWD_OPTIONS.length)]
+            SYS_RANDOM.choices(PWD_OPTIONS.charset, k=PWD_OPTIONS.length)
         )
+
+    dprint(f"shuffling password {PWD_OPTIONS.shuffle} times")
+
+    _pw: list[str] = list(generated_password)
+    for _ in range(PWD_OPTIONS.shuffle):
+        SYS_RANDOM.shuffle(_pw)
+    generated_password = "".join(_pw)
 
     dprint("password generated. calculating statistics...")
 
@@ -178,7 +193,10 @@ def generate_password() -> str:
     p_strength = (1 - p_stats.weakness_factor) * p_stats.strength()
 
     dprint(
-        f"generated new password. strength = {p_strength} out of {PWD_OPTIONS.min_strength} required, length = {len(generated_password)} out of {PWD_OPTIONS.length} and entropy = {p_stats.entropy_bits} out of {PWD_OPTIONS.min_entropy} required"
+        f"generated new password. strength = {p_strength} out of \
+{PWD_OPTIONS.min_strength} required, length = {len(generated_password)} \
+out of {PWD_OPTIONS.length} and entropy = {p_stats.entropy_bits} out of \
+{PWD_OPTIONS.min_entropy} required"
     )
 
     if PWD_OPTIONS.allow_modify:
@@ -187,7 +205,7 @@ def generate_password() -> str:
             (p_stats.entropy_bits * p_strength) // p_stats.length
             + SYS_RANDOM.randint(2, 30)
         )
-        PWD_OPTIONS.charset += secrets.choice(PWD_OPTIONS.charset)
+        PWD_OPTIONS.charset += SYS_RANDOM.choice(PWD_OPTIONS.charset)
 
     return (
         generated_password
@@ -200,7 +218,7 @@ def generate_password() -> str:
 def main() -> int:
     """Entry/main function"""
 
-    dprint(f"PWD_OPTIONS = {PWD_OPTIONS}")
+    dprint(f"{PWD_OPTIONS.__dict__ = }")
 
     if PWD_OPTIONS.interactive:
         dprint("interactive mode = on")
@@ -234,7 +252,7 @@ def main() -> int:
             end=PWD_OPTIONS.end.encode("raw_unicode_escape").decode("unicode_escape"),
         )
 
-    dprint(f"PWD_OPTIONS = {PWD_OPTIONS}")
+    dprint(f"{PWD_OPTIONS.__dict__ = }")
 
     return 0
 
