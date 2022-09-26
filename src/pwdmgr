@@ -353,6 +353,29 @@ class DatabaseCommandParser:
         del parsed_data[self._pick_entry(parsed_data)]
         GLOBAL_STATES["db-changed"] = True
 
+    def cmd_ed(
+        self, password: str, salt: bytes, parsed_data: List[List[str]], args
+    ) -> None:
+        """Edit an entry in the database: ed"""
+
+        if not parsed_data:
+            elog("No entried in the database to edit")
+            return
+
+        entry: List[str] = parsed_data[self._pick_entry(parsed_data)]
+        field: int = self._pick_entry_field()
+
+        input_fn: Callable = iinput
+
+        if field > 0:
+            input_fn = lambda prompt: iinput(prompt, True)
+
+        if field > 2:
+            input_fn = lambda prompt: epw(prompt, password, salt)
+
+        entry[field] = input_fn(f"Editing {PASSWORD_STRUCT[field]!r} for {entry[0]!r}")
+        GLOBAL_STATES["db-changed"] = True
+
 
 class CommandParser:
     def cmd_help(self, *args) -> None:
