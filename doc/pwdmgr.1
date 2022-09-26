@@ -9,21 +9,43 @@ pwdmgr \- password manager
 .SH SYNOPSIS
 
 .B pwdmgr
+[\fI\,database path\/\fR] [\fI\,database salt path\/\fR] [\fI\,should quit...\/\fR]
 
 .SH DESCRIPTION
 
+.br
+If program is supplied with the \fI\,database path\/\fR in the arguments,
+.br
+you also need to supply \fI\,database salt path\/\fR, if you also want
+.br
+to quit the REPL after closing the database also pass any arguments more
+.br
+than \fI\,database path\/\fR and \fI\,database salt path\/\fR, it'll by
+.br
+default drop you into the home mode REPL, if you pass anything other than
+.br
+those two arguments it'll by default quit the repl after closing the database
+
+
+REPL commands:
+
+
 .hy
+
 .IP \[bu] 2
 In home mode
 .RS 2
 .IP \[bu] 2
 \f[C]clear\f[R] -- Clear the screen
 .IP \[bu] 2
+\f[C]exit\f[R] -- Exit the REPL
+.IP \[bu] 2
 \f[C]help [cmds...]\f[R] -- Print help
 .IP \[bu] 2
 \f[C]new <database name>\f[R] -- Make a new database
 .IP \[bu] 2
 \f[C]open <database path> <database salt path>\f[R] -- Open a database
+
 .RE
 .IP \[bu] 2
 In database mode
@@ -48,7 +70,24 @@ In database mode
 \f[C]rm\f[R] -- Remove an entry from the database
 .IP \[bu] 2
 \f[C]show\f[R] -- Show entry in full
+
 .RE
+
+.SH EXAMPLES
+
+.TP
+\fIpwdmgr\fR
+Drop you into the home mode repl
+
+.TP
+\fIpwdmgr hello.pdb hello.slt\fR
+open the hello database, after quiting drop
+you into the home mode repl
+
+.TP
+\fIpwdmgr hello.pdb hello.slt something\fR
+open the hello database, after quiting quit
+the whole application
 
 .SH AUTHOR
 

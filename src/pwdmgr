@@ -5,12 +5,11 @@
 import base64
 import bz2
 import csv
-import getpass
 import os
-import readline
 import secrets
 import sys
 from enum import Enum, auto
+from getpass import getpass
 from io import StringIO
 from shutil import rmtree
 from typing import IO, Callable, Dict, List, Optional, Tuple
@@ -42,7 +41,11 @@ def encrypt(
     plaintext: bytes, password: str, salt: Optional[bytes] = None
 ) -> Tuple[bytes, bytes]:
     if salt is None:
-        salt = secrets.token_bytes(secrets.SystemRandom().randint(512, 1024))
+        # The salt used to be between 0.5 and 1 KB, for
+        # security, since pwdtools v1.1 it's between 1 and
+        # 2 KB
+
+        salt = secrets.token_bytes(secrets.SystemRandom().randint(1024, 2048))
 
     kdf: PBKDF2HMAC = PBKDF2HMAC(
         algorithm=KDF_ALGORITHM, length=KDF_LENGTH, salt=salt, iterations=KDF_ITERATIONS
@@ -90,16 +93,11 @@ def yn(q: str, d: str = "y") -> bool:
 
 
 def pw(prompt: str) -> str:
-    password: str = ""
-
-    while not password:
-        try:
-            password = getpass.getpass(f"  {prompt}: ")
-        except (EOFError, KeyboardInterrupt):
-            elog("\nFailed reading password")
-            sys.exit(1)
-
-    return password
+    try:
+        return getpass(f"  {prompt}: ")
+    except (EOFError, KeyboardInterrupt):
+        elog("\nFailed reading password")
+        sys.exit(1)
 
 
 def epw(prompt: str, password: str, salt: bytes) -> str:
@@ -125,13 +123,13 @@ and/or salt"
         sys.exit(1)
 
 
-def iinput(prompt: str, once: bool = False) -> str:
+def iinput(prompt: str, force: bool = False) -> str:
     data: str = ""
 
     while not data:
-        data = input(f"  {prompt}{' (optional)' if once else ''}: ")
+        data = input(f"  {prompt}: ")
 
-        if once:
+        if not force:
             break
 
     return data
@@ -201,7 +199,7 @@ def to_clipboard_or_out(data: str) -> None:
 
 class DatabaseCommandAction(Enum):
     DB_COMMIT = auto()
-    DB_EXIT = auto()
+    DB_CLOSE = auto()
 
 
 class DatabaseCommandParser:
@@ -260,8 +258,8 @@ class DatabaseCommandParser:
             parsed_data.append,
             [
                 " ".join(args),
-                iinput("Entry URL", True),
-                iinput("Entry note", True),
+                iinput("Entry URL"),
+                iinput("Entry note"),
                 epw("Entry username", password, salt),
                 epw("Entry password", password, salt),
             ],
@@ -284,8 +282,6 @@ class DatabaseCommandParser:
                 f"""{entry[0]}:
     URL:        {entry[1]}
     Note:       {entry[2]}
-    Username:   ***
-    Password:   ***
 """
             )
 
@@ -294,7 +290,7 @@ class DatabaseCommandParser:
     ) -> DatabaseCommandAction:
         """Close the database: close"""
 
-        return DatabaseCommandAction.DB_EXIT
+        return DatabaseCommandAction.DB_CLOSE
 
     def cmd_clear(
         self, password: str, salt: bytes, parsed_data: List[List[str]], args
@@ -367,11 +363,12 @@ class DatabaseCommandParser:
 
         input_fn: Callable = iinput
 
-        if field > 0:
-            input_fn = lambda prompt: iinput(prompt, True)
-
         if field > 2:
             input_fn = lambda prompt: epw(prompt, password, salt)
+        elif field > 0:
+            input_fn = lambda prompt: iinput(prompt)
+        elif field == 0:
+            input_fn = lambda prompt: iinput(prompt, True)
 
         entry[field] = input_fn(f"Editing {PASSWORD_STRUCT[field]!r} for {entry[0]!r}")
         GLOBAL_STATES["db-changed"] = True
@@ -396,6 +393,12 @@ class CommandParser:
         log(f"Making database {datb_path}({salt_path})")
 
         password: str = pw("Database password")
+
+        if not password and not yn(
+            "Are you sure you want to create a database with an empty password"
+        ):
+            while not password:
+                password = pw("Database password (required)")
 
         log(f"Compressing and encrypting the database {datb_path!r}")
 
@@ -430,12 +433,12 @@ class CommandParser:
         meaning you will never unlock your database ever again"""
         )
 
-    def cmd_open(self, *args) -> None:
+    def cmd_open(self, *args) -> Optional[bool]:
         """Open a database: open <database path> <database salt path>"""
 
         if len(args) < 2:
             elog("open: missing <database path> and/or <database salt path>")
-            return
+            return False
 
         password: str = pw("Database password")
 
@@ -446,7 +449,7 @@ class CommandParser:
                 salt: bytes = saltf.read()
         except FileNotFoundError:
             elog(f"Salt file {args[1]!r} does not exist")
-            return
+            return False
 
         log("Decrypting and decompressing the database")
 
@@ -455,19 +458,19 @@ class CommandParser:
                 db_data: bytes = bz2.decompress(decrypt(db.read(), password, salt))
         except FileNotFoundError:
             elog(f"Database {args[1]!r} does not exist")
-            return
+            return False
         except OSError as e:
             elog(
                 f"Potentially invalid BZ2 compressed data in database decryption, \
 error: {e.__class__.__name__}: {e}"
             )
-            return
+            return False
         except (InvalidSignature, InvalidToken):
             elog(
                 "Invalid database password, cryptography token/signature \
 and/or salt"
             )
-            return
+            return False
 
         log("Making a command parser")
         parser: DatabaseCommandParser = DatabaseCommandParser()
@@ -497,6 +500,9 @@ and/or salt"
                 break
             except KeyboardInterrupt:
                 print()
+                continue
+
+            if not cmd:
                 continue
 
             cmd_fn: Optional[Callable] = getattr(parser, f"cmd_{cmd[0]}", None)
@@ -537,7 +543,7 @@ and/or salt"
 
                     GLOBAL_STATES["db-changed"] = False
 
-                case DatabaseCommandAction.DB_EXIT:
+                case DatabaseCommandAction.DB_CLOSE:
                     if GLOBAL_STATES["db-changed"] and not yn(
                         "You did not commit the recent changes, discard them"
                     ):
@@ -546,19 +552,36 @@ and/or salt"
                     GLOBAL_STATES["db-changed"] = False
                     break
 
+        return None
+
     def cmd_clear(self) -> None:
         """Clear the screen: clear"""
 
         clear_sc()
 
+    def cmd_exit(self) -> None:
+        """Exit the REPL: exit"""
+
+        sys.exit(0)
+
 
 def main() -> int:
     """Entry/main function"""
 
-    readline.parse_and_bind("tab: complete")
-    readline.set_history_length(-1)
+    # We only need to set readline up in local ctx
+
+    from readline import parse_and_bind, set_history_length
+
+    parse_and_bind("tab: complete")
+    set_history_length(-1)
 
     parser: CommandParser = CommandParser()
+
+    if len(sys.argv) > 2:
+        db_ret: int = 0 if parser.cmd_open(*sys.argv[1:]) is None else 1
+
+        if len(sys.argv) > 3:
+            return db_ret
 
     while True:
         print()

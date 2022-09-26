@@ -62,5 +62,5 @@ None or see the man page
 -   `pwdmgr`
 
 ```
-None or see the man page
+See the man page
 ```
