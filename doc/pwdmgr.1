@@ -1,0 +1,58 @@
+.TH PWDMGR "1" "September 26" "Pwdmgr" "General Commands Manual"
+
+
+.SH NAME
+
+pwdmgr \- password manager
+
+
+.SH SYNOPSIS
+
+.B pwdmgr
+
+.SH DESCRIPTION
+
+.hy
+.IP \[bu] 2
+In home mode
+.RS 2
+.IP \[bu] 2
+\f[C]clear\f[R] -- Clear the screen
+.IP \[bu] 2
+\f[C]help [cmds...]\f[R] -- Print help
+.IP \[bu] 2
+\f[C]new <database name>\f[R] -- Make a new database
+.IP \[bu] 2
+\f[C]open <database path> <database salt path>\f[R] -- Open a database
+.RE
+.IP \[bu] 2
+In database mode
+.RS 2
+.IP \[bu] 2
+\f[C]clear\f[R] -- Clear the screen
+.IP \[bu] 2
+\f[C]close\f[R] -- Close the database
+.IP \[bu] 2
+\f[C]commit\f[R] -- Commit to the database
+.IP \[bu] 2
+\f[C]cp\f[R] -- Copy data from an entry to clipboard
+.IP \[bu] 2
+\f[C]entry <entry name...>\f[R] -- Add a new entry to the database
+.IP \[bu] 2
+\f[C]help [cmds...]\f[R] -- Print help
+.IP \[bu] 2
+\f[C]ls\f[R] -- List entries in your database
+.IP \[bu] 2
+\f[C]rm\f[R] -- Remove an entry from the database
+.IP \[bu] 2
+\f[C]show\f[R] -- Show entry in full
+.RE
+
+.SH AUTHOR
+
+Written by Ari Archer <ari.web.xyz@gmail.com>
+
+.SH "REPORTING BUGS"
+
+Report any bugs or feature requests to https://ari-web.xyz/gh/pwdtools issues
+

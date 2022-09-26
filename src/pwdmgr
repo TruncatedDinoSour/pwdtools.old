@@ -1,0 +1,570 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Password manager"""
+
+import base64
+import bz2
+import csv
+import getpass
+import os
+import readline
+import secrets
+import sys
+from enum import Enum, auto
+from io import StringIO
+from shutil import rmtree
+from typing import IO, Callable, Dict, List, Optional, Tuple
+from warnings import filterwarnings as filter_warnings
+
+import pyperclip  # type: ignore
+from cryptography.exceptions import InvalidSignature
+from cryptography.fernet import Fernet, InvalidToken
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from plumbum.commands.processes import ProcessExecutionError  # type: ignore
+from pyfzf import FzfPrompt  # type: ignore
+
+KDF_ALGORITHM: hashes.SHA512 = hashes.SHA512()
+KDF_LENGTH: int = 32
+KDF_ITERATIONS: int = 384_000
+
+GLOBAL_STATES: Dict[str, bool] = {"db-changed": False}
+PASSWORD_STRUCT: Tuple[str, ...] = (
+    "name",
+    "url",
+    "note",
+    "username",
+    "password",
+)
+
+
+def encrypt(
+    plaintext: bytes, password: str, salt: Optional[bytes] = None
+) -> Tuple[bytes, bytes]:
+    if salt is None:
+        salt = secrets.token_bytes(secrets.SystemRandom().randint(512, 1024))
+
+    kdf: PBKDF2HMAC = PBKDF2HMAC(
+        algorithm=KDF_ALGORITHM, length=KDF_LENGTH, salt=salt, iterations=KDF_ITERATIONS
+    )
+    key: bytes = kdf.derive(password.encode("utf-8"))
+
+    return (
+        Fernet(base64.urlsafe_b64encode(key)).encrypt(plaintext),
+        salt,
+    )
+
+
+def decrypt(ciphertext: bytes, password: str, salt: bytes) -> bytes:
+    kdf: PBKDF2HMAC = PBKDF2HMAC(
+        algorithm=KDF_ALGORITHM, length=KDF_LENGTH, salt=salt, iterations=KDF_ITERATIONS
+    )
+    key: bytes = kdf.derive(password.encode("utf-8"))
+
+    return Fernet(base64.urlsafe_b64encode(key)).decrypt(ciphertext)
+
+
+def clear_sc() -> None:
+    sys.stdout.write("\033[H\033[J")
+
+
+def log(m: str, s: IO = sys.stdout) -> None:
+    print(f"  {m}", file=s)
+
+
+def elog(m: str) -> None:
+    log(f"attention: {m}", sys.stderr)
+
+
+def first_line(s: str) -> str:
+    return s.split("\n")[0]
+
+
+def yn(q: str, d: str = "y") -> bool:
+    d = d[0].lower()
+
+    try:
+        return (input(f"  {q}? {'[y/n]'.replace(d, d.upper())} ") + d)[0].lower() == "y"
+    except (KeyboardInterrupt, EOFError):
+        return d == "y"
+
+
+def pw(prompt: str) -> str:
+    password: str = ""
+
+    while not password:
+        try:
+            password = getpass.getpass(f"  {prompt}: ")
+        except (EOFError, KeyboardInterrupt):
+            elog("\nFailed reading password")
+            sys.exit(1)
+
+    return password
+
+
+def epw(prompt: str, password: str, salt: bytes) -> str:
+    return base64.b85encode(
+        bz2.compress(encrypt(pw(prompt).encode(), password, salt)[0])
+    ).decode()
+
+
+def pwe(enc: str, password: str, salt: bytes) -> str:
+    try:
+        return decrypt(bz2.decompress(base64.b85decode(enc)), password, salt).decode()
+    except OSError as e:
+        elog(
+            f"Potentially invalid BZ2 compressed data at password decryption, \
+error: {e.__class__.__name__}: {e}"
+        )
+        sys.exit(1)
+    except (InvalidSignature, InvalidToken):
+        elog(
+            "Invalid password entry password, cryptography token/signature \
+and/or salt"
+        )
+        sys.exit(1)
+
+
+def iinput(prompt: str, once: bool = False) -> str:
+    data: str = ""
+
+    while not data:
+        data = input(f"  {prompt}{' (optional)' if once else ''}: ")
+
+        if once:
+            break
+
+    return data
+
+
+def verify_path(file_path: str) -> str:
+    if len(file_path) > 192:
+        elog(f"File path {file_path!r} is longer than 192 characters")
+        sys.exit(1)
+
+    if os.path.exists(file_path):
+        elog(f"{file_path!r} already exists")
+
+        if yn(f" * Overwrite {file_path!r}"):
+            if os.path.isdir(file_path):
+                rmtree(file_path)
+            else:
+                os.remove(file_path)
+        else:
+            sys.exit(0)
+
+    return file_path
+
+
+def mk_spath(name: str, ext: str) -> str:
+    return verify_path(f"{name}.{ext}".replace("/", ""))
+
+
+def print_doc_comment(fun: Callable) -> None:
+    log(
+        f"{fun.__name__[4:]:10s} \
+{first_line(fun.__doc__ or 'No help provided')}"
+    )
+
+
+def print_obj_cmd_help(o: object, args: Tuple[str, ...]) -> None:
+    if args:
+        for arg in args:
+            cmd_fn: Optional[Callable] = getattr(o, f"cmd_{arg}", None)
+
+            if cmd_fn is None:
+                elog(f"warning: no help for {arg!r}")
+                continue
+
+            print_doc_comment(cmd_fn)
+    else:
+        for fun in dir(o):
+            if not fun.startswith("cmd_"):
+                continue
+
+            print_doc_comment(getattr(o, fun))
+
+
+def change_db(fun: Callable, *args) -> None:
+    fun(*args)
+    GLOBAL_STATES["db-changed"] = True
+
+
+def to_clipboard_or_out(data: str) -> None:
+    try:
+        pyperclip.copy(data)
+        log("Copied to clipboard")
+    except pyperclip.PyperclipException:
+        if yn("Cannot copy data to clipboard, would you like to display it instead"):
+            print(data)
+
+
+class DatabaseCommandAction(Enum):
+    DB_COMMIT = auto()
+    DB_EXIT = auto()
+
+
+class DatabaseCommandParser:
+    def _pick_entry(self, data: List[List[str]]) -> int:
+        try:
+            return int(
+                FzfPrompt()
+                .prompt(
+                    (
+                        f"{idx} :: {' | '.join(repr(ent[eidx]) for eidx in range(3))}"
+                        for idx, ent in enumerate(data)
+                    ),
+                    "--prompt='Pick an entry: '",
+                )[0]
+                .split(" ", maxsplit=1)[0]
+            )
+        except ProcessExecutionError:
+            return self._pick_entry(data)
+        except ValueError:
+            elog("Picked an invalid index value")
+            sys.exit(1)
+
+    def _pick_entry_field(self) -> int:
+        try:
+            return int(
+                FzfPrompt()
+                .prompt(
+                    (f"{idx} | {name}" for idx, name in enumerate(PASSWORD_STRUCT)),
+                    "--prompt='Pick an entry field: '",
+                )[0]
+                .split(" ", maxsplit=1)[0]
+            )
+        except ProcessExecutionError:
+            return self._pick_entry_field()
+        except ValueError:
+            elog("Picked an invalid index value")
+            sys.exit(1)
+
+    def cmd_help(
+        self, password: str, salt: bytes, parsed_data: List[List[str]], args
+    ) -> None:
+        """Print help: help [cmds...]"""
+
+        print_obj_cmd_help(self, args)
+
+    def cmd_entry(
+        self, password: str, salt: bytes, parsed_data: List[List[str]], args
+    ) -> None:
+        """Add a new entry to the database: entry <entry name...>"""
+
+        if not args:
+            elog("entry: missing <entry name...>")
+            return
+
+        change_db(
+            parsed_data.append,
+            [
+                " ".join(args),
+                iinput("Entry URL", True),
+                iinput("Entry note", True),
+                epw("Entry username", password, salt),
+                epw("Entry password", password, salt),
+            ],
+        )
+
+    def cmd_commit(
+        self, password: str, salt: bytes, parsed_data: List[List[str]], args
+    ) -> DatabaseCommandAction:
+        """Commit to the database: commit"""
+
+        return DatabaseCommandAction.DB_COMMIT
+
+    def cmd_ls(
+        self, password: str, salt: bytes, parsed_data: List[List[str]], args
+    ) -> None:
+        """List entries in your database: ls"""
+
+        for entry in parsed_data:
+            log(
+                f"""{entry[0]}:
+    URL:        {entry[1]}
+    Note:       {entry[2]}
+    Username:   ***
+    Password:   ***
+"""
+            )
+
+    def cmd_close(
+        self, password: str, salt: bytes, parsed_data: List[List[str]], args
+    ) -> DatabaseCommandAction:
+        """Close the database: close"""
+
+        return DatabaseCommandAction.DB_EXIT
+
+    def cmd_clear(
+        self, password: str, salt: bytes, parsed_data: List[List[str]], args
+    ) -> None:
+        """Clear the screen: clear"""
+
+        clear_sc()
+
+    def cmd_show(
+        self, password: str, salt: bytes, parsed_data: List[List[str]], args
+    ) -> None:
+        """Show entry in full: show"""
+
+        if not parsed_data:
+            elog("No entries to show")
+            return
+
+        entry: List[str] = parsed_data[self._pick_entry(parsed_data)]
+
+        for eidx, ent in enumerate(entry):
+            content: str = ent
+
+            if eidx > 2:
+                content = pwe(ent, password, salt)
+
+            log(f"{PASSWORD_STRUCT[eidx].capitalize():10s} {content}")
+
+    def cmd_cp(
+        self, password: str, salt: bytes, parsed_data: List[List[str]], args
+    ) -> None:
+        """Copy data from an entry to clipboard: cp"""
+
+        if not parsed_data:
+            elog("No entries so can't copy anything")
+            return
+
+        entry: List[str] = parsed_data[self._pick_entry(parsed_data)]
+        field: int = self._pick_entry_field()
+
+        data: str = entry[field]
+
+        if field > 2:
+            data = pwe(data, password, salt)
+
+        to_clipboard_or_out(data)
+
+    def cmd_rm(
+        self, password: str, salt: bytes, parsed_data: List[List[str]], args
+    ) -> None:
+        """Remove an entry from the database: rm"""
+
+        if not parsed_data:
+            elog("Cannot remove any entries from an empty database")
+            return
+
+        del parsed_data[self._pick_entry(parsed_data)]
+        GLOBAL_STATES["db-changed"] = True
+
+
+class CommandParser:
+    def cmd_help(self, *args) -> None:
+        """Print help: help [cmds...]"""
+
+        print_obj_cmd_help(self, args)
+
+    def cmd_new(self, *args) -> None:
+        """Make a new database: new <database name>"""
+
+        if not args:
+            elog("new: missing database name")
+            return
+
+        datb_path: str = mk_spath(args[0], "pdb")
+        salt_path: str = mk_spath(args[0], "slt")
+
+        log(f"Making database {datb_path}({salt_path})")
+
+        password: str = pw("Database password")
+
+        log(f"Compressing and encrypting the database {datb_path!r}")
+
+        bz2.BZ2File(datb_path, "w").close()
+
+        with open(datb_path, "rb") as db:
+            encrypted, salt = encrypt(db.read(), password)
+
+        with open(datb_path, "wb") as dbe:
+            dbe.write(encrypted)
+
+        log(f"Writting the database salt to {salt_path!r}")
+
+        with open(salt_path, "wb") as saltf:
+            saltf.write(salt)
+
+        print(
+            f"""
+  Done making a new database, make sure to:
+
+    - Keep {datb_path!r} safe
+      * It's your database, you will not have your passwords
+        if you lose it
+      * Even though the database is basically ascii text
+        I would not suggest opening it and/or editing it
+        as it can mess it up
+    - Keep {salt_path!r} safe
+      * It's just as important as your password, you
+        will not be able to unlock your database without it
+      * Never open it in any text editor and/or word processor
+        and save it because the file might get messed up
+        meaning you will never unlock your database ever again"""
+        )
+
+    def cmd_open(self, *args) -> None:
+        """Open a database: open <database path> <database salt path>"""
+
+        if len(args) < 2:
+            elog("open: missing <database path> and/or <database salt path>")
+            return
+
+        password: str = pw("Database password")
+
+        log("Reading the salt")
+
+        try:
+            with open(args[1], "rb") as saltf:
+                salt: bytes = saltf.read()
+        except FileNotFoundError:
+            elog(f"Salt file {args[1]!r} does not exist")
+            return
+
+        log("Decrypting and decompressing the database")
+
+        try:
+            with open(args[0], "rb") as db:
+                db_data: bytes = bz2.decompress(decrypt(db.read(), password, salt))
+        except FileNotFoundError:
+            elog(f"Database {args[1]!r} does not exist")
+            return
+        except OSError as e:
+            elog(
+                f"Potentially invalid BZ2 compressed data in database decryption, \
+error: {e.__class__.__name__}: {e}"
+            )
+            return
+        except (InvalidSignature, InvalidToken):
+            elog(
+                "Invalid database password, cryptography token/signature \
+and/or salt"
+            )
+            return
+
+        log("Making a command parser")
+        parser: DatabaseCommandParser = DatabaseCommandParser()
+
+        log("Parsing database data")
+        db_data_parsed: List[List[str]] = list(csv.reader(StringIO(db_data.decode())))
+
+        log("Database has been opened")
+
+        while True:
+            print()
+
+            try:
+                cmd: List[str] = (
+                    input(
+                        f" {'*' if GLOBAL_STATES['db-changed'] else ''}{args[0]}({args[1]})> "
+                    )
+                    .strip()
+                    .split()
+                )
+            except EOFError:
+                print()
+
+                if GLOBAL_STATES["db-changed"]:
+                    elog("Exiting without saving any changes")
+
+                break
+            except KeyboardInterrupt:
+                print()
+                continue
+
+            cmd_fn: Optional[Callable] = getattr(parser, f"cmd_{cmd[0]}", None)
+
+            if cmd_fn is None:
+                elog(f"{cmd[0]}: command not found")
+                continue
+
+            match cmd_fn(password, salt, db_data_parsed, cmd[1:]):
+                case None:
+                    pass
+
+                case DatabaseCommandAction.DB_COMMIT:
+                    if not GLOBAL_STATES["db-changed"]:
+                        elog("No changes to commit")
+                        continue
+
+                    log("Committing to database")
+
+                    with StringIO() as csv_out:
+                        log("Parsing data")
+
+                        w = csv.writer(csv_out)
+                        w.writerows(db_data_parsed)
+
+                        csv_out.seek(0)
+
+                        log("Compressing and encrypting the database")
+
+                        with open(args[0], "wb") as db:
+                            db.write(
+                                encrypt(
+                                    bz2.compress(csv_out.read().encode()),
+                                    password,
+                                    salt,
+                                )[0]
+                            )
+
+                    GLOBAL_STATES["db-changed"] = False
+
+                case DatabaseCommandAction.DB_EXIT:
+                    if GLOBAL_STATES["db-changed"] and not yn(
+                        "You did not commit the recent changes, discard them"
+                    ):
+                        continue
+
+                    GLOBAL_STATES["db-changed"] = False
+                    break
+
+    def cmd_clear(self) -> None:
+        """Clear the screen: clear"""
+
+        clear_sc()
+
+
+def main() -> int:
+    """Entry/main function"""
+
+    readline.parse_and_bind("tab: complete")
+    readline.set_history_length(-1)
+
+    parser: CommandParser = CommandParser()
+
+    while True:
+        print()
+
+        try:
+            cmd: List[str] = input(" >> ").strip().split()
+        except EOFError:
+            print()
+            break
+        except KeyboardInterrupt:
+            print()
+            continue
+
+        if not cmd:
+            continue
+
+        cmd_fn: Optional[Callable] = getattr(parser, f"cmd_{cmd[0]}", None)
+
+        if cmd_fn is None:
+            elog(f"{cmd[0]}: command not found")
+            continue
+
+        cmd_fn(*cmd[1:])
+
+    return 0
+
+
+if __name__ == "__main__":
+    assert main.__annotations__.get("return") is int, "main() should return an integer"
+
+    filter_warnings("error", category=Warning)
+    sys.exit(main())

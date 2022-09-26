@@ -3,4 +3,5 @@ pyfzf
 pyperclip
 plumbum
 zxcvbn
+cryptography
 
