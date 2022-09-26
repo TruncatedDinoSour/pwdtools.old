@@ -70,6 +70,13 @@ def decrypt(ciphertext: bytes, password: str, salt: bytes) -> bytes:
 def clear_sc() -> None:
     sys.stdout.write("\033[H\033[J")
 
+def clear_cb() -> None:
+    try:
+        pyperclip.copy("")
+    except pyperclip.PyperclipException:
+        clear_sc()
+
+    log("Cleared your clipboard")
 
 def log(m: str, s: IO = sys.stdout) -> None:
     print(f"  {m}", file=s)
@@ -373,6 +380,13 @@ class DatabaseCommandParser:
         entry[field] = input_fn(f"Editing {PASSWORD_STRUCT[field]!r} for {entry[0]!r}")
         GLOBAL_STATES["db-changed"] = True
 
+    def cmd_cc(
+        self, password: str, salt: bytes, parsed_data: List[List[str]], args
+    ) -> None:
+        """Clear clipboard: cc"""
+
+        clear_cb()
+
 
 class CommandParser:
     def cmd_help(self, *args) -> None:
@@ -554,15 +568,20 @@ and/or salt"
 
         return None
 
-    def cmd_clear(self) -> None:
+    def cmd_clear(self, *args) -> None:
         """Clear the screen: clear"""
 
         clear_sc()
 
-    def cmd_exit(self) -> None:
+    def cmd_exit(self, *args) -> None:
         """Exit the REPL: exit"""
 
         sys.exit(0)
+
+    def cmd_cc(self, *args) -> None:
+        """Clear clipboard: cc"""
+
+        clear_cb()
 
 
 def main() -> int:
