@@ -10,6 +10,8 @@ main() {
 
     printf "PREFIX: %s\tBINDIR: %s\tMANPREFIX: %s\n" "$PREFIX" "$BINDIR" "$MANPREFIX"
 
+    install -d "$PREFIX"
+
     if [ "$I_MAN" ]; then
         install -d "$BINDIR"
         (command -v man >/dev/null && install -d "${MANPREFIX}/man1") || true
