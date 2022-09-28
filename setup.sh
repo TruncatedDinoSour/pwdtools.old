@@ -38,10 +38,11 @@ main() {
         (command -v man >/dev/null && install -d "${MANPREFIX}/man5") || true
 
         for man5 in doc/extra/man/*; do
-            echo "Installing: $(basename "$man5")"
+            man5_page="$(basename "$man5")"
+            echo "Installing: $man5_page"
 
-            install -Dm0644 "$man5" "${MANPREFIX}/man5/$man5"
-            mandb -qf "${MANPREFIX}/man5/$man5"
+            install -Dm0644 "$man5" "${MANPREFIX}/man5/$man5_page"
+            mandb -qf "${MANPREFIX}/man5/$man5_page"
         done
     fi
 }
