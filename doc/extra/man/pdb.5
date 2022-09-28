@@ -1,0 +1,143 @@
+.TH PDB "5" "September 28" "Pdb" "Linux Programmer's Manual"
+
+
+.SH NAME
+
+pdb \- \fIpwdmgr(1)\fR custom database format
+
+
+.SH DESCRIPTION
+
+.hy
+.IP \[bu] 2
+Model definitions:
+.RS 2
+.IP \[bu] 2
+[[str]] \[en] A 2D string array
+.IP \[bu] 2
+Encryption [+] salting \[en] Encryption + salting with already known
+password and salt
+.IP \[bu] 2
+Encryption + salting \[en] Encryption + salting with an unknown password
+and/or salt
+.IP \[bu] 2
+TRNG(x, y) \[en] True (or hardware) random number between x and y
+.RE
+.IP \[bu] 2
+Encryption:
+.RS 2
+.IP \[bu] 2
+Generate random salt using random bytes:
+.RS 2
+.IP \[bu] 2
+Count (b): TRNG(1024, 2048)
+.RE
+.IP \[bu] 2
+Derive a PBKDF2HMAC key:
+.RS 2
+.IP \[bu] 2
+Algorithm: SHA512
+.IP \[bu] 2
+Length: 32
+.IP \[bu] 2
+Salt: The random generated salt
+.IP \[bu] 2
+Iterations: 384000
+.RE
+.IP \[bu] 2
+Symmetrical encryption:
+.RS 2
+.IP \[bu] 2
+Key: The URL-safe base-64 encoded key
+.RE
+.IP \[bu] 2
+Format: ASCII text
+.IP \[bu] 2
+More:
+\fIhttps://stackoverflow.com/questions/73532164/proper-data-encryption-with-a-user-set-password-in-python3\fR
+.RE
+.IP \[bu] 2
+Formats:
+.RS 2
+.IP \[bu] 2
+Salt: Always random raw bytes
+.IP \[bu] 2
+Password: ASCII text
+.IP \[bu] 2
+Database: ASCII text
+.RS 2
+.IP \[bu] 2
+Entries: CSV row
+.RE
+.RE
+.IP \[bu] 2
+Steps:
+.RS 2
+.IP \[bu] 2
+Salt: Extremely random bytes
+.IP \[bu] 2
+Password: A user-set string
+.IP \[bu] 2
+Database: ASCII text which represents encrypted data
+.RS 2
+.IP \[bu] 2
+Database:
+.RS 2
+.IP \[bu] 2
+Array: [[str]]
+.IP \[bu] 2
+CSV data
+.IP \[bu] 2
+Bzip2 best-level compression
+.IP \[bu] 2
+Encryption + salting
+.RE
+.IP \[bu] 2
+Entries:
+.RS 2
+.IP \[bu] 2
+Structure:
+.RS 2
+.IP \[bu] 2
+Name: ASCII text
+.IP \[bu] 2
+URL: ASCII text
+.IP \[bu] 2
+Username:
+.RS 2
+.IP \[bu] 2
+Encryption [+] salting
+.RE
+.IP \[bu] 2
+Password
+.RS 2
+.IP \[bu] 2
+Encryption [+] salting
+.IP \[bu] 2
+Bzip2 best-level compression
+.IP \[bu] 2
+Base85 encoding
+.RE
+.RE
+.IP \[bu] 2
+Format: [[str]]
+.RE
+.RE
+.RE
+
+.SH EXAMPLES
+
+.TP
+gAAAAABjM58xE4InKBlnEQEwk6etJmwmDtjcFHeaEkUHXEXyb5yNPzriyMCzuDd07IBW50LtEn6PO4dBsXpxB0v7U4ySaEbC1A==
+This is an example of an empty database
+
+
+.SH AUTHOR
+
+Written by Ari Archer <ari.web.xyz@gmail.com>
+
+
+.SH "REPORTING BUGS"
+
+Report any bugs or feature requests to https://ari-web.xyz/gh/pwdtools issues
+

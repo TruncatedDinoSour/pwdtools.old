@@ -10,23 +10,40 @@ main() {
 
     printf "PREFIX: %s\tBINDIR: %s\tMANPREFIX: %s\n" "$PREFIX" "$BINDIR" "$MANPREFIX"
 
-    install -d "$BINDIR"
-    (command -v man >/dev/null && install -d "${MANPREFIX}/man1/$man_page") || true
+    if [ "$I_MAN" ]; then
+        install -d "$BINDIR"
+        (command -v man >/dev/null && install -d "${MANPREFIX}/man1") || true
+    fi
 
     for script in src/*; do
         echo "Installing '$script'"
         install -Dm755 "$script" "$BINDIR"
 
-        man_page="$(basename "$script").1"
-        local_man_page="doc/$man_page"
+        if [ "$I_MAN" ]; then
+            man_page="$(basename "$script").1"
+            local_man_page="doc/man/$man_page"
 
-        if [ -f "$local_man_page" ] && [ -d "$MANPREFIX" ] && command -v man >/dev/null; then
-            echo "Installing man page: $man_page"
+            if [ -f "$local_man_page" ] && [ -d "$MANPREFIX" ] && command -v man >/dev/null; then
+                echo "Installing man page: $man_page"
 
-            install -Dm0644 "$local_man_page" "${MANPREFIX}/man1/$man_page"
-            mandb -qf "${MANPREFIX}/man1/$man_page"
+                install -Dm0644 "$local_man_page" "${MANPREFIX}/man1/$man_page"
+                mandb -qf "${MANPREFIX}/man1/$man_page"
+            fi
         fi
     done
+
+    if [ "$I_DEVMAN" ]; then
+        echo "Installing dev manuals"
+
+        (command -v man >/dev/null && install -d "${MANPREFIX}/man5") || true
+
+        for man5 in doc/extra/man/*; do
+            echo "Installing: $(basename "$man5")"
+
+            install -Dm0644 "$man5" "${MANPREFIX}/man5/$man5"
+            mandb -qf "${MANPREFIX}/man5/$man5"
+        done
+    fi
 }
 
 main "$@"

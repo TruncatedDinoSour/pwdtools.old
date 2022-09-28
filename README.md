@@ -22,9 +22,16 @@
 
 ```bash
 python3 -m pip install --user -r requirements.txt
-chmod a+rx ./setup.sh
-sudo ./setup.sh
+sudo sh ./setup.sh
 ```
+
+## Environment variables
+
+-   `PREFIX` -- Where to install the tools and resources to [`/usr/local/`]
+-   `BINDIR` -- The binary directory to which to install tools to [`$PREFIX/bin/`]
+-   `MANPREFIX` -- Where to install man pages to [`$PREFIX/share/man/`]
+-   `I_MAN` -- Do you want to install man pages [`false`]
+-   `I_DEVMAN` -- Do you want to install development man pages [`false`]
 
 ## Packages
 

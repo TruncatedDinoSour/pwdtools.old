@@ -70,6 +70,7 @@ def decrypt(ciphertext: bytes, password: str, salt: bytes) -> bytes:
 def clear_sc() -> None:
     sys.stdout.write("\033[H\033[J")
 
+
 def clear_cb() -> None:
     try:
         pyperclip.copy("")
@@ -77,6 +78,7 @@ def clear_cb() -> None:
         clear_sc()
 
     log("Cleared your clipboard")
+
 
 def log(m: str, s: IO = sys.stdout) -> None:
     print(f"  {m}", file=s)
@@ -471,7 +473,7 @@ class CommandParser:
             with open(args[0], "rb") as db:
                 db_data: bytes = bz2.decompress(decrypt(db.read(), password, salt))
         except FileNotFoundError:
-            elog(f"Database {args[1]!r} does not exist")
+            elog(f"Database {args[0]!r} does not exist")
             return False
         except OSError as e:
             elog(

@@ -1,0 +1,42 @@
+-   Model definitions:
+    -   [[str]] -- A 2D string array
+    -   Encryption [+] salting -- Encryption + salting with already known password and salt
+    -   Encryption + salting -- Encryption + salting with an unknown password and/or salt
+    -   TRNG(x, y) -- True (or hardware) random number between x and y
+-   Encryption:
+    -   Generate random salt using random bytes:
+        -   Count (b): TRNG(1024, 2048)
+    -   Derive a PBKDF2HMAC key:
+        -   Algorithm: SHA512
+        -   Length: 32
+        -   Salt: The random generated salt
+        -   Iterations: 384000
+    -   Symmetrical encryption:
+        -   Key: The URL-safe base-64 encoded key
+    -   Format: ASCII text
+    -   More: <https://stackoverflow.com/questions/73532164/proper-data-encryption-with-a-user-set-password-in-python3>
+-   Formats:
+    -   Salt: Always random raw bytes
+    -   Password: ASCII text
+    -   Database: ASCII text
+        -   Entries: CSV row
+-   Steps:
+    -   Salt: Extremely random bytes
+    -   Password: A user-set string
+    -   Database: ASCII text which represents encrypted data
+        -   Database:
+            -   Array: [[str]]
+            -   CSV data
+            -   Bzip2 best-level compression
+            -   Encryption + salting
+        -   Entries:
+            -   Structure:
+                -   Name: ASCII text
+                -   URL: ASCII text
+                -   Username:
+                    -   Encryption [+] salting
+                -   Password
+                    -   Encryption [+] salting
+                    -   Bzip2 best-level compression
+                    -   Base85 encoding
+            -   Format: [[str]]
