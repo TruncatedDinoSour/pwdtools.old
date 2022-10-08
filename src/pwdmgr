@@ -12,7 +12,9 @@ from enum import Enum, auto
 from getpass import getpass
 from io import StringIO
 from shutil import rmtree
-from typing import IO, Callable, Dict, List, Optional, Tuple
+from threading import Thread
+from time import sleep as sleep_secs
+from typing import IO, Any, Callable, Dict, List, NoReturn, Optional, Tuple
 from warnings import filterwarnings as filter_warnings
 
 import pyperclip  # type: ignore
@@ -23,11 +25,19 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from plumbum.commands.processes import ProcessExecutionError  # type: ignore
 from pyfzf import FzfPrompt  # type: ignore
 
+__version__: str = "0.0.1"
+__author__: str = "Ari Archer <ari.web.xyz@gmail.com>"
+
+
 KDF_ALGORITHM: hashes.SHA512 = hashes.SHA512()
 KDF_LENGTH: int = 32
+CC_TIMER: int = 30
 KDF_ITERATIONS: int = 384_000
 
-GLOBAL_STATES: Dict[str, bool] = {"db-changed": False}
+GLOBAL_STATES: Dict[str, Any] = {
+    "db-changed": False,
+    "cc-timer": 0,
+}
 PASSWORD_STRUCT: Tuple[str, ...] = (
     "name",
     "url",
@@ -40,6 +50,8 @@ PASSWORD_STRUCT: Tuple[str, ...] = (
 def encrypt(
     plaintext: bytes, password: str, salt: Optional[bytes] = None
 ) -> Tuple[bytes, bytes]:
+    """Symetric salted encryption"""
+
     if salt is None:
         # The salt used to be between 0.5 and 1 KB, for
         # security, since pwdtools v1.1 it's between 1 and
@@ -59,6 +71,8 @@ def encrypt(
 
 
 def decrypt(ciphertext: bytes, password: str, salt: bytes) -> bytes:
+    """Symetric salted decryption"""
+
     kdf: PBKDF2HMAC = PBKDF2HMAC(
         algorithm=KDF_ALGORITHM, length=KDF_LENGTH, salt=salt, iterations=KDF_ITERATIONS
     )
@@ -68,31 +82,60 @@ def decrypt(ciphertext: bytes, password: str, salt: bytes) -> bytes:
 
 
 def clear_sc() -> None:
-    sys.stdout.write("\033[H\033[J")
+    """Clear the screen"""
+
+    print("\033[H\033[J", end="")
 
 
-def clear_cb() -> None:
+def cc_timer_reset() -> None:
+    """Reset clear clipboard timer"""
+
+    elog(f"Clearing your clipboard after {CC_TIMER} seconds")
+    GLOBAL_STATES["cc-timer"] = CC_TIMER
+
+
+def clear_cb(screen: bool = True) -> None:
+    """Clear the clipboard"""
+
     try:
         pyperclip.copy("")
     except pyperclip.PyperclipException:
-        clear_sc()
+        if screen:
+            clear_sc()
 
-    log("Cleared your clipboard")
+    if screen:
+        log("Cleared your clipboard")
 
 
 def log(m: str, s: IO = sys.stdout) -> None:
+    """Log message"""
+
     print(f"  {m}", file=s)
 
 
 def elog(m: str) -> None:
+    """Log an error message"""
+
     log(f"attention: {m}", sys.stderr)
 
 
-def first_line(s: str) -> str:
-    return s.split("\n")[0]
+def cexit(code: int = 0) -> NoReturn:
+    """Exit clearing the user's keyboard"""
+
+    clear_cb(False)
+    sys.exit(code)
+
+
+def ferr(m: str) -> NoReturn:
+    """Fatal error"""
+
+    elog(m)
+    cexit(1)
 
 
 def yn(q: str, d: str = "y") -> bool:
+    """Yes/No question"""
+
     d = d[0].lower()
 
     try:
@@ -102,37 +145,42 @@ def yn(q: str, d: str = "y") -> bool:
 
 
 def pw(prompt: str) -> str:
+    """Get password/hidden input"""
+
     try:
         return getpass(f"  {prompt}: ")
     except (EOFError, KeyboardInterrupt):
-        elog("\nFailed reading password")
-        sys.exit(1)
+        ferr("\rFailed reading the password")
 
 
 def epw(prompt: str, password: str, salt: bytes) -> str:
+    """Encrypt, compress and encode given input with a given password and salt"""
+
     return base64.b85encode(
         bz2.compress(encrypt(pw(prompt).encode(), password, salt)[0])
     ).decode()
 
 
 def pwe(enc: str, password: str, salt: bytes) -> str:
+    """Deencrypt, compress and encode given input with a given password and salt"""
+
     try:
         return decrypt(bz2.decompress(base64.b85decode(enc)), password, salt).decode()
     except OSError as e:
-        elog(
+        ferr(
             f"Potentially invalid BZ2 compressed data at password decryption, \
 error: {e.__class__.__name__}: {e}"
         )
-        sys.exit(1)
     except (InvalidSignature, InvalidToken):
-        elog(
+        ferr(
             "Invalid password entry password, cryptography token/signature \
 and/or salt"
         )
-        sys.exit(1)
 
 
 def iinput(prompt: str, force: bool = False) -> str:
+    """Wrapper for input() with an optional forcing of a value"""
+
     data: str = ""
 
     while not data:
@@ -145,9 +193,10 @@ def iinput(prompt: str, force: bool = False) -> str:
 
 
 def verify_path(file_path: str) -> str:
+    """Verify if a path is valid"""
+
     if len(file_path) > 192:
-        elog(f"File path {file_path!r} is longer than 192 characters")
-        sys.exit(1)
+        ferr(f"File path {file_path!r} is longer than 192 characters")
 
     if os.path.exists(file_path):
         elog(f"{file_path!r} already exists")
@@ -158,23 +207,29 @@ def verify_path(file_path: str) -> str:
             else:
                 os.remove(file_path)
         else:
-            sys.exit(0)
+            cexit(0)
 
     return file_path
 
 
 def mk_spath(name: str, ext: str) -> str:
+    """Makes a secure path"""
+
     return verify_path(f"{name}.{ext}".replace("/", ""))
 
 
 def print_doc_comment(fun: Callable) -> None:
+    """Print doc comment and the function name"""
+
     log(
         f"{fun.__name__[4:]:10s} \
-{first_line(fun.__doc__ or 'No help provided')}"
+{fun.__doc__ or 'No help provided'}"
     )
 
 
 def print_obj_cmd_help(o: object, args: Tuple[str, ...]) -> None:
+    """Print an object's command help (optionally selected help)"""
+
     if args:
         for arg in args:
             cmd_fn: Optional[Callable] = getattr(o, f"cmd_{arg}", None)
@@ -192,15 +247,22 @@ def print_obj_cmd_help(o: object, args: Tuple[str, ...]) -> None:
             print_doc_comment(getattr(o, fun))
 
 
-def change_db(fun: Callable, *args) -> None:
-    fun(*args)
+def change_db(fun: Optional[Callable] = None, *args: Any) -> None:
+    """Change the database"""
+
+    if fun is not None:
+        fun(*args)
+
     GLOBAL_STATES["db-changed"] = True
 
 
 def to_clipboard_or_out(data: str) -> None:
+    """Copy data to clipboard or output it"""
+
     try:
         pyperclip.copy(data)
         log("Copied to clipboard")
+        cc_timer_reset()
     except pyperclip.PyperclipException:
         if yn("Cannot copy data to clipboard, would you like to display it instead"):
             print(data)
@@ -212,7 +274,11 @@ class DatabaseCommandAction(Enum):
 
 
 class DatabaseCommandParser:
+    """Database mode commands"""
+
     def _pick_entry(self, data: List[List[str]]) -> int:
+        """Pick an entry from a database"""
+
         try:
             return int(
                 FzfPrompt()
@@ -228,10 +294,11 @@ class DatabaseCommandParser:
         except ProcessExecutionError:
             return self._pick_entry(data)
         except ValueError:
-            elog("Picked an invalid index value")
-            sys.exit(1)
+            ferr("Picked an invalid index value")
 
     def _pick_entry_field(self) -> int:
+        """Pick an entry field from an entry"""
+
         try:
             return int(
                 FzfPrompt()
@@ -244,8 +311,7 @@ class DatabaseCommandParser:
         except ProcessExecutionError:
             return self._pick_entry_field()
         except ValueError:
-            elog("Picked an invalid index value")
-            sys.exit(1)
+            ferr("Picked an invalid index value")
 
     def cmd_help(
         self, password: str, salt: bytes, parsed_data: List[List[str]], args
@@ -356,7 +422,7 @@ class DatabaseCommandParser:
             return
 
         del parsed_data[self._pick_entry(parsed_data)]
-        GLOBAL_STATES["db-changed"] = True
+        change_db()
 
     def cmd_ed(
         self, password: str, salt: bytes, parsed_data: List[List[str]], args
@@ -380,7 +446,7 @@ class DatabaseCommandParser:
             input_fn = lambda prompt: iinput(prompt, True)
 
         entry[field] = input_fn(f"Editing {PASSWORD_STRUCT[field]!r} for {entry[0]!r}")
-        GLOBAL_STATES["db-changed"] = True
+        change_db()
 
     def cmd_cc(
         self, password: str, salt: bytes, parsed_data: List[List[str]], args
@@ -389,8 +455,17 @@ class DatabaseCommandParser:
 
         clear_cb()
 
+    def cmd_change(
+        self, password: str, salt: bytes, parsed_data: List[List[str]], args
+    ) -> None:
+        """Mark the database as changed, but don't change anything: change"""
+
+        change_db()
+
 
 class CommandParser:
+    """Home mode commands"""
+
     def cmd_help(self, *args) -> None:
         """Print help: help [cmds...]"""
 
@@ -502,7 +577,8 @@ and/or salt"
             try:
                 cmd: List[str] = (
                     input(
-                        f" {'*' if GLOBAL_STATES['db-changed'] else ''}{args[0]}({args[1]})> "
+                        f" [{GLOBAL_STATES['cc-timer']}] \
+{'*' if GLOBAL_STATES['db-changed'] else ''}{args[0]}({args[1]})> "
                     )
                     .strip()
                     .split()
@@ -533,7 +609,10 @@ and/or salt"
 
                 case DatabaseCommandAction.DB_COMMIT:
                     if not GLOBAL_STATES["db-changed"]:
-                        elog("No changes to commit")
+                        elog(
+                            "No changes to commit, try the `change` command, \
+perhaps?"
+                        )
                         continue
 
                     log("Committing to database")
@@ -578,7 +657,7 @@ and/or salt"
     def cmd_exit(self, *args) -> None:
         """Exit the REPL: exit"""
 
-        sys.exit(0)
+        cexit(0)
 
     def cmd_cc(self, *args) -> None:
         """Clear clipboard: cc"""
@@ -589,6 +668,9 @@ and/or salt"
 def main() -> int:
     """Entry/main function"""
 
+    run_main: bool = True
+    ret: int = 0
+
     # We only need to set readline up in local ctx
 
     from readline import parse_and_bind, set_history_length
@@ -598,17 +680,36 @@ def main() -> int:
 
     parser: CommandParser = CommandParser()
 
+    # Automatic clipboard clearing
+
+    def cc_thread() -> None:
+        """Automatically clear clipboard (daemon thread target function)"""
+
+        while True:
+            sleep_secs(1)
+
+            if GLOBAL_STATES["cc-timer"] <= 0:
+                continue
+
+            GLOBAL_STATES["cc-timer"] -= 1
+
+            if GLOBAL_STATES["cc-timer"] <= 0:
+                clear_cb(False)
+
+    elog("Starting the automatic keyboard clearing daemon thread")
+    Thread(target=cc_thread, daemon=True).start()
+
     if len(sys.argv) > 2:
-        db_ret: int = 0 if parser.cmd_open(*sys.argv[1:]) is None else 1
+        ret = 0 if parser.cmd_open(*sys.argv[1:]) is None else 1
 
-        if len(sys.argv) > 3:
-            return db_ret
+        if len(sys.argv) == 3:
+            run_main = False
 
-    while True:
+    while run_main:
         print()
 
         try:
-            cmd: List[str] = input(" >> ").strip().split()
+            cmd: List[str] = input(f" [{GLOBAL_STATES['cc-timer']}]> ").strip().split()
         except EOFError:
             print()
             break
@@ -627,7 +728,8 @@ def main() -> int:
 
         cmd_fn(*cmd[1:])
 
-    return 0
+    clear_cb()
+    return ret
 
 
 if __name__ == "__main__":

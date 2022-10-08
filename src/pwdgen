@@ -13,6 +13,7 @@ from pyperclip import PyperclipException  # type: ignore
 from pyperclip import copy as copy_clipboard  # type: ignore
 
 __version__: str = "0.0.4"
+__author__: str = "Ari Archer <ari.web.xyz@gmail.com>"
 SYS_RANDOM: secrets.SystemRandom = secrets.SystemRandom()
 
 

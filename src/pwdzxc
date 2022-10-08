@@ -7,6 +7,10 @@ from getpass import getpass
 import zxcvbn  # type: ignore
 from password_strength import PasswordStats  # type: ignore
 
+__version__: str = "0.0.1"
+__author__: str = "Ari Archer <ari.web.xyz@gmail.com>"
+
+
 SCORE_STRINGS: dict[int, str] = {
     0: "Very bad",
     1: "Bad",
