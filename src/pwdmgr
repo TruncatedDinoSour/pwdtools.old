@@ -103,6 +103,8 @@ def clear_cb(screen: bool = True) -> None:
         if screen:
             clear_sc()
 
+    GLOBAL_STATES["cc-timer"] = 0
+
     if screen:
         log("Cleared your clipboard")
 

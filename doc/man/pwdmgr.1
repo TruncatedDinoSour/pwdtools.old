@@ -9,7 +9,7 @@ pwdmgr \- password manager
 .SH SYNOPSIS
 
 .B pwdmgr
-[\fI\,database path\/\fR] [\fI\,database salt path\/\fR] [\fI\,should quit...\/\fR]
+[\fI\,database path\/\fR] [\fI\,database salt path\/\fR] [\fI\,should NOT quit...\/\fR]
 
 .SH DESCRIPTION
 
@@ -24,7 +24,7 @@ than \fI\,database path\/\fR and \fI\,database salt path\/\fR, it'll by
 .br
 default drop you into the home mode REPL, if you pass anything other than
 .br
-those two arguments it'll by default quit the repl after closing the database
+those two arguments it'll by default NOT quit the repl after closing the database
 
 
 REPL commands:
@@ -87,13 +87,12 @@ Drop you into the home mode repl
 
 .TP
 \fIpwdmgr hello.pdb hello.slt\fR
-open the hello database, after quiting drop
-you into the home mode repl
+open the hello database, after quiting, quit
+the whole application
 
 .TP
 \fIpwdmgr hello.pdb hello.slt something\fR
-open the hello database, after quiting quit
-the whole application
+open the hello database, drop you into the home mode repl
 
 .SH AUTHOR
 
