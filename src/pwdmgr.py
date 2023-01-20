@@ -54,7 +54,7 @@ def encrypt(
 
     if salt is None:
         # the salt used to be between 0.5 and 1 KB, for
-        # security, since pwdtools v1.2 it's between 2 and
+        # security, since pwdtools v1.7 it's between 2 and
         # 4 KB
 
         salt = secrets.token_bytes(secrets.SystemRandom().randint(2048, 8192))
