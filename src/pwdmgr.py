@@ -25,7 +25,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from plumbum.commands.processes import ProcessExecutionError  # type: ignore
 from pyfzf import FzfPrompt  # type: ignore
 
-__version__: str = "0.0.2"
+__version__: str = "0.0.3"
 __author__: str = "Ari Archer <ari.web.xyz@gmail.com>"
 
 
@@ -55,7 +55,7 @@ def encrypt(
     if salt is None:
         # the salt used to be between 0.5 and 1 KB, for
         # security, since pwdtools v1.7 it's between 2 and
-        # 4 KB
+        # 8 KB
 
         salt = secrets.token_bytes(secrets.SystemRandom().randint(2048, 8192))
 
@@ -118,7 +118,7 @@ def log(m: str, s: IO[str] = sys.stdout) -> None:
 def elog(m: str) -> None:
     """log an error message"""
 
-    log(f"attention: {m}", sys.stderr)
+    log(f"attention : {m}", sys.stderr)
 
 
 def cexit(code: int = 0) -> NoReturn:
@@ -152,7 +152,7 @@ def pw(prompt: str) -> str:
     """get password / hidden input"""
 
     try:
-        return getpass(f"  {prompt}: ")
+        return getpass(f"  {prompt} : ")
     except (EOFError, KeyboardInterrupt):
         ferr("\rfailed reading the password")
 
@@ -165,13 +165,7 @@ def eepw(data: str, password: str, salt: bytes) -> str:
     ).decode()
 
 
-def epw(prompt: str, password: str, salt: bytes) -> str:
-    """wrapper for eepw() to read from stdin"""
-
-    return eepw(pw(prompt), password, salt)
-
-
-def pwe(enc: str, password: str, salt: bytes) -> str:
+def pwee(enc: str, password: str, salt: bytes) -> str:
     """decrypt, compress and encode given input with a given password and salt"""
 
     try:
@@ -187,6 +181,10 @@ error: {e.__class__.__name__}: {e}"
 and/or salt"
         )
 
+def epw(prompt: str, password: str, salt: bytes) -> str:
+    """wrapper for eepw() to read from stdin"""
+
+    return eepw(pw(prompt), password, salt)
 
 def iinput(prompt: str, force: bool = False) -> str:
     """wrapper for input() with an optional forcing of a value"""
@@ -194,7 +192,7 @@ def iinput(prompt: str, force: bool = False) -> str:
     data: str = ""
 
     while not data:
-        data = input(f"  {prompt}: ")
+        data = input(f"  {prompt} : ")
 
         if not force:
             break
@@ -392,7 +390,7 @@ class DatabaseCommandParser:
         )
 
     def cmd_commit(self, **_) -> DatabaseCommandAction:
-        """commit to the database: commit"""
+        """commit to the database : commit"""
 
         return DatabaseCommandAction.DB_COMMIT
 
@@ -401,9 +399,9 @@ class DatabaseCommandParser:
 
         for entry in parsed_data:
             log(
-                f"""{entry[0]}:
-    URL:        {entry[1]}
-    note:       {entry[2]}
+                f"""{entry[0]} :
+    URL :        {entry[1]}
+    note :       {entry[2]}
 """
             )
 
@@ -432,7 +430,7 @@ class DatabaseCommandParser:
             content: str = ent
 
             if eidx > 2:
-                content = pwe(ent, password, salt)
+                content = pwee(ent, password, salt)
 
             log(f"{PASSWORD_STRUCT[eidx].capitalize():10s} {content}")
 
@@ -451,7 +449,7 @@ class DatabaseCommandParser:
         data: str = entry[field]
 
         if field > 2:
-            data = pwe(data, password, salt)
+            data = pwee(data, password, salt)
 
         to_clipboard_or_out(data)
 
@@ -519,7 +517,7 @@ class DatabaseCommandParser:
         log("decrypting the database ...")
 
         new_parsed_data: list[list[str]] = [list(PASSWORD_STRUCT)] + map_to_db(
-            pwe, password, salt, parsed_data
+            pwee, password, salt, parsed_data
         )
 
         log(f"writing to {args[0]!r} ...")
@@ -585,7 +583,7 @@ class DatabaseCommandParser:
 
             for fidx, nfield in enumerate(needed_fields):
                 if nfield is None:
-                    pw.append("" if fidx <= 3 else pwe("", password, salt))
+                    pw.append("" if fidx <= 3 else pwee("", password, salt))
                     continue
 
                 if fidx >= 3:
@@ -744,7 +742,7 @@ and/or salt"
             ] | None = getattr(parser, f"cmd_{cmd[0]}", None)
 
             if cmd_fn is None:
-                elog(f"{cmd[0]}: command not found")
+                elog(f"{cmd[0]} : command not found")
                 continue
 
             match cmd_fn(  # type: ignore
@@ -856,7 +854,7 @@ def main() -> int:
         cmd_fn: Callable[..., Any] | None = getattr(parser, f"cmd_{cmd[0]}", None)
 
         if cmd_fn is None:
-            elog(f"{cmd[0]}: command not found")
+            elog(f"{cmd[0]} : command not found")
             continue
 
         cmd_fn(*cmd[1:])
