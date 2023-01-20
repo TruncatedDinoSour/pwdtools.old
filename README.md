@@ -4,17 +4,12 @@
 
 # Requirements
 
--   Python 3.8 or higher
--   Linux or any other UNIX operating system
--   Python password-strength -- https://pypi.org/project/password-strength/
--   Python plumbum -- https://pypi.org/project/plumbum/
--   Python pyfzf -- https://pypi.org/project/pyfzf/
--   Python pyperclip -- https://pypi.org/project/pyperclip/
--   Python support for the `secrets` lib
+-   python 3.10 or higher
+-   linux or any other UNIX operating system
+-   python support for the `secrets` lib
 -   GNU coreutils (or an `install` utility) -- https://www.gnu.org/software/coreutils/
--   Optionally `man` utility for `man` pages -- https://www.nongnu.org/man-db/
--   Python zxcvbn -- https://pypi.org/project/zxcvbn/
--   Python cryptography -- https://pypi.org/project/cryptography/
+-   optionally `man` utility for `man` pages -- https://www.nongnu.org/man-db/
+-   everything from `requirements.txt`
 
 # Installation
 
