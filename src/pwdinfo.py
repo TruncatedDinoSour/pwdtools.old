@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Get info of a password"""
+"""get info of a password"""
 
 import sys
 from getpass import getpass
@@ -11,12 +11,12 @@ __author__: str = "Ari Archer <ari.web.xyz@gmail.com>"
 
 
 def main() -> int:
-    """Entry/main function"""
+    """entry/main function"""
 
     password = getpass("(password (hidden)) ")
 
     if not password.strip():
-        sys.stderr.write("Password cannot be empty\n")
+        sys.stderr.write("password cannot be empty\n")
         return 1
 
     stats = PasswordStats(password)

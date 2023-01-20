@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Get info of a password using zxcvbn"""
+"""get info of a password using zxcvbn"""
 
 import sys
 from getpass import getpass
@@ -12,11 +12,11 @@ __author__: str = "Ari Archer <ari.web.xyz@gmail.com>"
 
 
 SCORE_STRINGS: dict[int, str] = {
-    0: "Very bad",
-    1: "Bad",
-    2: "Not good",
-    3: "Good",
-    4: "Strong",
+    0: "very bad",
+    1: "bad",
+    2: "not good",
+    3: "good",
+    4: "strong",
 }
 
 
@@ -34,7 +34,7 @@ def main() -> int:
     password = getpass("(password (hidden)) ")
 
     if not password.strip():
-        sys.stderr.write("Password cannot be empty\n")
+        sys.stderr.write("password cannot be empty\n")
         return 1
 
     pwd_stats = PasswordStats(password)
@@ -61,7 +61,7 @@ def main() -> int:
 
     for key, value in zxcvbn_stats["crack_times_display"].items():
         INFO[
-            f"Crack time ({filter_zxcvbn_crack_key(key)})"
+            f"crack time ({filter_zxcvbn_crack_key(key)})"
         ] = f"{zxcvbn_stats['crack_times_seconds'][key]} seconds ({value})"
 
     for item, value in INFO.items():

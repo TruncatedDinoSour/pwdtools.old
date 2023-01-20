@@ -17,16 +17,18 @@ main() {
         (command -v man >/dev/null && install -d "${MANPREFIX}/man1") || true
     fi
 
-    for script in src/*; do
-        echo "Installing '$script'"
-        install -Dm755 "$script" "$BINDIR"
+    for script in src/*.py; do
+        sc_base="$(basename "$script" .py)"
+
+        echo "installing '$script'"
+        install -Dm755 "$script" "$BINDIR/$sc_base"
 
         if [ "$I_MAN" ]; then
-            man_page="$(basename "$script").1"
+            man_page="$sc_base.1"
             local_man_page="doc/man/$man_page"
 
             if [ -f "$local_man_page" ] && [ -d "$MANPREFIX" ] && command -v man >/dev/null; then
-                echo "Installing man page: $man_page"
+                echo "installing man page : $man_page"
 
                 install -Dm0644 "$local_man_page" "${MANPREFIX}/man1/$man_page"
                 mandb -qf "${MANPREFIX}/man1/$man_page"
@@ -35,13 +37,13 @@ main() {
     done
 
     if [ "$I_DEVMAN" ]; then
-        echo "Installing dev manuals"
+        echo "installing dev manuals"
 
         (command -v man >/dev/null && install -d "${MANPREFIX}/man5") || true
 
         for man5 in doc/extra/man/*; do
             man5_page="$(basename "$man5")"
-            echo "Installing: $man5_page"
+            echo "installing : $man5_page"
 
             install -Dm0644 "$man5" "${MANPREFIX}/man5/$man5_page"
             mandb -qf "${MANPREFIX}/man5/$man5_page"

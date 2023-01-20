@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Password generator script"""
+"""password generator"""
 
 import secrets
 import string
@@ -161,7 +161,7 @@ def dprint(msg: str) -> None:
 
 
 def generate_password() -> str:
-    """Generate and return a password"""
+    """generate and return a password"""
 
     dprint(f"generating new password of length of {PWD_OPTIONS.length}")
 
@@ -217,7 +217,7 @@ out of {PWD_OPTIONS.length} and entropy = {p_stats.entropy_bits} out of \
 
 
 def main() -> int:
-    """Entry/main function"""
+    """entry/main function"""
 
     dprint(f"{PWD_OPTIONS.__dict__ = }")
 
@@ -226,11 +226,11 @@ def main() -> int:
         dprint(f"generating {PWD_OPTIONS.interactive_count} passwords")
 
         try:
-            password = FzfPrompt().prompt(
+            password: str = FzfPrompt().prompt(  # type: ignore
                 (generate_password() for _ in range(PWD_OPTIONS.interactive_count))
             )[0]
         except ProcessExecutionError:
-            eprint("Fzf exited unexpectedly")
+            eprint("fzf exited unexpectedly")
             return 1
     else:
         dprint("generating password")
@@ -242,7 +242,7 @@ def main() -> int:
         try:
             copy_clipboard(password)
         except PyperclipException as err:
-            eprint(f"Failed to copy to clipboard: {err}")
+            eprint(f"failed to copy to clipboard: {err}")
             return 1
 
         dprint("copied password to clipboard")
@@ -269,7 +269,7 @@ if __name__ == "__main__":
         try:
             sys.setrecursionlimit(PWD_OPTIONS.recursion_limit)
         except OverflowError:
-            eprint("The set limit via -L is too large")
+            eprint("the set limit via -L is too large")
             sys.exit(1)
 
     dprint("asserting main()")
@@ -282,7 +282,7 @@ if __name__ == "__main__":
     try:
         ret = main()
     except (RecursionError, MemoryError):
-        eprint("Too much recursion, try passing the -L flag with a higher/lower number")
+        eprint("too much recursion, try passing the -L flag with a higher/lower number")
         ret = 1
 
     sys.exit(ret)

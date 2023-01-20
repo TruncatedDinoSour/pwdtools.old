@@ -4,4 +4,3 @@ pyperclip
 plumbum
 zxcvbn
 cryptography
-
